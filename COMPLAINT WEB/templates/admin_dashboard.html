@@ -1,0 +1,305 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="glass-panel" style="margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 2rem;">
+    <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+        <div style="width: 120px; height: 120px; border-radius: 50%; overflow: hidden; border: 4px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            {% if g.user.photo %}
+            <img src="{{ url_for('download_file', name=g.user.photo) }}" alt="Profile Photo" style="width: 100%; height: 100%; object-fit: cover;">
+            {% else %}
+            <div style="width: 100%; height: 100%; background: var(--bg-gradient); display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--primary); font-weight: bold;">
+                {{ g.user.name[0] | upper }}
+            </div>
+            {% endif %}
+        </div>
+        <div>
+            <h2 style="font-size: 1.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem; text-transform: capitalize;">{{ g.user.name }}</h2>
+            <p style="color: var(--primary); font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">{{ g.user.designation if g.user.designation else 'Administrator' }}</p>
+            <div style="display: flex; gap: 1.5rem; color: var(--text-muted); font-size: 0.95rem; flex-wrap: wrap;">
+                <span>📧 {{ g.user.email }}</span>
+                <span>📱 {{ g.user.phone if g.user.phone else 'Not provided' }}</span>
+                <span>🎂 Age: {{ g.user.age if g.user.age else 'N/A' }}</span>
+            </div>
+        </div>
+    </div>
+    <button onclick="document.getElementById('editProfileForm').style.display = 'block'" class="btn btn-outline" style="border-radius: 9999px;">✏️ Edit Profile</button>
+</div>
+
+<!-- Edit Profile Form (Hidden by default) -->
+<div id="editProfileForm" class="glass-panel" style="display: none; margin-bottom: 2rem; border: 2px solid var(--primary);">
+    <h3 style="margin-bottom: 1.5rem;">Update Profile</h3>
+    <form action="{{ url_for('update_profile') }}" method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+        <div class="form-group">
+            <label>Designation</label>
+            <input type="text" name="designation" class="form-control" value="{{ g.user.designation if g.user.designation else '' }}" placeholder="e.g. Chief Administrator">
+        </div>
+        <div class="form-group">
+            <label>Age</label>
+            <input type="number" name="age" class="form-control" value="{{ g.user.age if g.user.age else '' }}" placeholder="e.g. 45">
+        </div>
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" name="phone" class="form-control" value="{{ g.user.phone if g.user.phone else '' }}" placeholder="e.g. +1 234 567 8900">
+        </div>
+        <div class="form-group">
+            <label>Profile Photo</label>
+            <input type="file" name="photo" class="form-control" accept="image/*" style="padding: 0.6rem;">
+        </div>
+        <div style="grid-column: 1 / -1; display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem;">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('editProfileForm').style.display = 'none'">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+<div class="dashboard-header">
+    <h2>Admin Dashboard - All Complaints</h2>
+    
+    <form method="GET" style="display: flex; gap: 1rem; align-items: center;">
+        <label>Filter by Status:</label>
+        <select name="status" class="form-control" style="width: auto;" onchange="this.form.submit()">
+            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
+            <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>Pending</option>
+            <option value="In Progress" {% if status_filter == 'In Progress' %}selected{% endif %}>In Progress</option>
+            <option value="Resolved" {% if status_filter == 'Resolved' %}selected{% endif %}>Resolved</option>
+            <option value="Rejected" {% if status_filter == 'Rejected' %}selected{% endif %}>Rejected</option>
+        </select>
+    </form>
+</div>
+
+<div class="charts-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+    <div class="glass-panel" style="padding: 1.5rem;">
+        <h3 style="text-align: center; margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-main);">Complaints by Status</h3>
+        <canvas id="statusChart"></canvas>
+    </div>
+    <div class="glass-panel" style="padding: 1.5rem;">
+        <h3 style="text-align: center; margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-main);">Complaints by Category</h3>
+        <canvas id="categoryChart"></canvas>
+    </div>
+</div>
+
+<div class="glass-panel">
+    {% if complaints %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>User</th>
+                    <th>Complaint</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Assign Dept</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in complaints %}
+                <tr>
+                    <td>{{ c.date[:10] }}</td>
+                    <td>{{ c.user_name }}</td>
+                    <td>
+                        <strong>{{ c.title }}</strong> ({{ c.category }})
+                        {% if c.file_path %}
+                            <br><a href="{{ url_for('download_file', name=c.file_path) }}" target="_blank" style="font-size: 0.85em; color: var(--primary);">View Proof</a>
+                        {% endif %}
+                    </td>
+                    <td><span class="priority-{{ c.priority }}">{{ c.priority }}</span></td>
+                    <td>
+                        <span class="badge 
+                            {% if c.status == 'Pending' %}badge-pending
+                            {% elif c.status == 'In Progress' %}badge-progress
+                            {% else %}badge-resolved{% endif %}">
+                            {{ c.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('assign_complaint') }}" method="POST" style="display: flex; gap: 0.5rem;">
+                            <input type="hidden" name="complaint_id" value="{{ c.complaint_id }}">
+                            <select name="dept_id" class="form-control" style="padding: 0.25rem 0.5rem;" required>
+                                <option value="" disabled {% if not c.dept_name %}selected{% endif %}>Select Dept</option>
+                                {% for d in departments %}
+                                    <option value="{{ d.dept_id }}" {% if d.dept_name == c.dept_name %}selected{% endif %}>{{ d.dept_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-primary btn-sm">Assign</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p style="text-align: center; color: var(--text-muted); padding: 2rem;">No complaints found.</p>
+    {% endif %}
+</div>
+
+<div class="dashboard-header" style="margin-top: 3rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <h2>Manage Users</h2>
+    <input type="text" id="userSearch" class="form-control" placeholder="Search by name, email, or dept..." style="width: 100%; max-width: 400px;" onkeyup="filterUsers()">
+</div>
+
+{% set active_students = users | selectattr('role', 'equalto', 'student') | selectattr('is_active', 'equalto', 1) | list %}
+{% set active_staff = users | selectattr('role', 'equalto', 'department') | selectattr('is_active', 'equalto', 1) | list %}
+{% set terminated_users = users | selectattr('is_active', 'equalto', 0) | list %}
+
+<div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+    <!-- Students Section -->
+    <div class="glass-panel">
+        <h3 style="margin-bottom: 1.5rem; color: var(--text-main); font-size: 1.3rem;">Registered Students</h3>
+        {% if active_students %}
+        <div class="table-responsive">
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in active_students %}
+                    <tr class="user-row">
+                        <td>{{ u.name }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>
+                            <form action="{{ url_for('toggle_user_status', user_id=u.user_id) }}" method="POST" onsubmit="return confirm('Are you sure you want to terminate this student?');">
+                                <button type="submit" class="btn btn-sm" style="background: var(--danger); color: white;">Terminate</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="text-align: center; color: var(--text-muted); padding: 1rem;">No active students registered.</p>
+        {% endif %}
+    </div>
+
+    <!-- Department Staff Section -->
+    <div class="glass-panel">
+        <h3 style="margin-bottom: 1.5rem; color: var(--text-main); font-size: 1.3rem;">Department Staff</h3>
+        {% if active_staff %}
+        <div class="table-responsive">
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Department</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in active_staff %}
+                    <tr class="user-row">
+                        <td>{{ u.name }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>{{ u.dept_name if u.dept_name else '-' }}</td>
+                        <td>
+                            <form action="{{ url_for('toggle_user_status', user_id=u.user_id) }}" method="POST" onsubmit="return confirm('Are you sure you want to terminate this staff member?');">
+                                <button type="submit" class="btn btn-sm" style="background: var(--danger); color: white;">Terminate</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="text-align: center; color: var(--text-muted); padding: 1rem;">No active staff registered.</p>
+        {% endif %}
+    </div>
+
+    <!-- Terminated Users Section -->
+    <div class="glass-panel" style="border: 1px solid var(--danger);">
+        <h3 style="margin-bottom: 1.5rem; color: var(--danger); font-size: 1.3rem;">Terminated Users</h3>
+        {% if terminated_users %}
+        <div class="table-responsive">
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in terminated_users %}
+                    <tr class="user-row">
+                        <td style="text-decoration: line-through; color: var(--text-muted);">{{ u.name }}</td>
+                        <td style="text-decoration: line-through; color: var(--text-muted);">{{ u.email }}</td>
+                        <td><span style="text-transform: capitalize;">{{ u.role }}</span></td>
+                        <td>
+                            <form action="{{ url_for('toggle_user_status', user_id=u.user_id) }}" method="POST" onsubmit="return confirm('Are you sure you want to restore this user\'s access?');">
+                                <button type="submit" class="btn btn-sm" style="background: var(--success); color: white;">Restore</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="text-align: center; color: var(--text-muted); padding: 1rem;">No users are currently terminated.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function filterUsers() {
+    let input = document.getElementById('userSearch').value.toLowerCase();
+    let rows = document.querySelectorAll('.user-row');
+    
+    rows.forEach(row => {
+        let text = row.innerText.toLowerCase();
+        row.style.display = text.includes(input) ? '' : 'none';
+    });
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+
+    const statusData = {{ chart_status|tojson|safe }};
+    const categoryData = {{ chart_category|tojson|safe }};
+
+    new Chart(statusCtx, {
+        type: 'bar',
+        data: {
+            labels: statusData.labels,
+            datasets: [{
+                label: 'Complaints',
+                data: statusData.data,
+                backgroundColor: ['#f59e0b', '#4f46e5', '#10b981', '#ef4444'],
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: {
+            labels: categoryData.labels,
+            datasets: [{
+                data: categoryData.data,
+                backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6b7280'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '70%',
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+</script>
+{% endblock %}
